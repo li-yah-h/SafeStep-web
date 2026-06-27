@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>SafeStep — Navigation Assistant</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">SafeStep</span>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite">Ready to start.</p>
+  </header>
+
+  <main class="stage">
+    <div class="viewport">
+      <!-- Hidden capture source; the visible feed is drawn onto #canvas -->
+      <video id="video" playsinline muted hidden></video>
+      <canvas id="canvas" hidden></canvas>
+      <canvas id="display" class="display-canvas"></canvas>
+      <canvas id="overlay" class="overlay-canvas" width="640" height="480"></canvas>
+
+      <div class="viewport-empty" id="viewportEmpty">
+        <p>Camera feed will appear here once started.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="startBtn" class="btn btn-primary">Start watching</button>
+      <button id="stopBtn" class="btn btn-secondary" disabled>Stop</button>
+
+      <label class="toggle">
+        <input type="checkbox" id="debugToggle" checked />
+        <span>Show detection boxes</span>
+      </label>
+    </div>
+
+    <section class="legend" aria-label="Alert priority legend">
+      <div class="legend-item"><span class="dot dot-p1"></span> Immediate danger</div>
+      <div class="legend-item"><span class="dot dot-p2"></span> Caution</div>
+      <div class="legend-item"><span class="dot dot-p3"></span> Awareness</div>
+    </section>
+
+    <p class="hint">
+      Point your camera ahead of you. SafeStep speaks alerts aloud as obstacles are detected —
+      use headphones or a speaker for clearest audio.
+    </p>
+  </main>
+
+  <script src="/static/camera.js"></script>
+  <script src="/static/audio.js"></script>
+  <script src="/static/app.js"></script>
+  <script>
+    // Mirrors the live video feed onto the visible canvas, since #video
+    // itself stays hidden (camera.js uses it only as a raw capture source).
+    const video = document.getElementById("video");
+    const display = document.getElementById("display");
+    const displayCtx = display.getContext("2d");
+    const viewportEmpty = document.getElementById("viewportEmpty");
+
+    function renderLoop() {
+      if (video.readyState >= 2) {
+        display.width = 640;
+        display.height = 480;
+        displayCtx.drawImage(video, 0, 0, 640, 480);
+        viewportEmpty.style.display = "none";
+      }
+      requestAnimationFrame(renderLoop);
+    }
+    renderLoop();
+  </script>
+</body>
+</html>

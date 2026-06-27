@@ -1,3 +1,4 @@
+
 import logging
 from collections import defaultdict, deque
 from typing import Dict, List, Optional
@@ -48,10 +49,10 @@ SMOOTHING_WINDOW = 4
 
 
 class InferenceEngine:
-
+    
 
     def __init__(self, model_name: str = settings.MODEL_NAME, shared_model: Optional[YOLO] = None):
-       
+        
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         if shared_model is not None:
@@ -191,7 +192,16 @@ class InferenceEngine:
             logger.debug("Pruned %d lost track(s): %s", len(lost_ids), lost_ids)
 
 
-
+# ---------------------------------------------------------------------------
+# Singleton + public contract function — KEPT FOR PARITY / SINGLE-SESSION USE
+#
+# This matches SafeStep Final's exact public API and is what tests/test_*.py
+# exercises. It is intentionally NOT what server.py uses for live multi-user
+# traffic - server.py gives each WebSocket session its own InferenceEngine
+# (see SessionState in server.py). Use process_frame() only for local
+# single-stream scripts, CLI testing, or the test suite, exactly as the
+# original main.py did.
+# ---------------------------------------------------------------------------
 
 _engine_instance: Optional[InferenceEngine] = None
 

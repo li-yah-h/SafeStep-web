@@ -6,11 +6,7 @@ from typing import Tuple
 
 @dataclass
 class Detection:
-    """
-    Output of the Inference module / input to the Spatial module.
-
-    Represents a single object detected in one video frame.
-    """
+    
     label: str                         # COCO class name, e.g. "person", "car"
     confidence: float                  # Smoothed confidence score, 0.0–1.0
     bbox: Tuple[int, int, int, int]    # (x1, y1, x2, y2) pixel coords
@@ -22,11 +18,7 @@ class Detection:
 
 @dataclass
 class AudioAlert:
-    """
-    Output of the Spatial module / input to the Audio module.
-
-    Represents one spoken alert to be delivered to the user.
-    """
+    
     priority:  int    # 1 = Immediate danger | 2 = Caution | 3 = Environment
     message:   str    # Exact sentence to speak, e.g. "Stop! Car directly ahead!"
     object_id: str    # Stable ID for cooldown tracking, e.g. "car_12 o'clock_1 step away"

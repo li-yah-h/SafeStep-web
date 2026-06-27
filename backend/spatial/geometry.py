@@ -1,4 +1,3 @@
-
 import logging
 from collections import defaultdict, deque
 from typing import Dict, List, Tuple
@@ -244,15 +243,7 @@ def analyze_scene(
     frame_width: int,
     frame_height: int,
 ) -> List[AudioAlert]:
-    """
-    Public contract function — imported by main.py.
-
-    Passes detections through the SpatialAnalyzer and returns a
-    priority-sorted, deduplicated List[AudioAlert].
-
-    The analyzer is a singleton so approach-velocity history
-    persists across frames (required for _check_approach to work).
-    """
+    
     global _analyzer_instance
     if _analyzer_instance is None:
         _analyzer_instance = SpatialAnalyzer(frame_width, frame_height)

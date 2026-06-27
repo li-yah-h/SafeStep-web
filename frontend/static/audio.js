@@ -49,7 +49,9 @@ class SafeStepAudioEngine {
       return;
     }
 
-   
+    // Mark as spoken now, pre-emptively — same reasoning as the original:
+    // blocks duplicate alerts arriving in the same detection burst before
+    // speech actually starts.
     this._cooldownTracker.set(alert.object_id, now);
 
     // Priority-1 flush: drop all pending P2/P3 items, exactly like

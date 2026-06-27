@@ -1,12 +1,3 @@
-
-
-# ------------------------------------------------------------------
-# Camera Settings
-# ------------------------------------------------------------------
-# NOTE: CAMERA_INDEX / TARGET_FPS / CAMERA_ROTATION are no longer used by the
-# web backend (the browser owns the camera now — see frontend/static/camera.js).
-# Kept here so anyone reading settings.py side-by-side with the original can
-# see exactly what mapped to what.
 CAMERA_INDEX  = 0
 FRAME_WIDTH   = 640   # Must match the resolution the browser captures at
 FRAME_HEIGHT  = 480

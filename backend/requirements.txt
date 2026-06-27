@@ -1,0 +1,15 @@
+# SafeStep Web — Backend dependencies
+# Install with: pip install -r requirements.txt
+
+# Web server + WebSockets
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# Image decoding (browser sends JPEG bytes; no camera capture happens here)
+opencv-python-headless>=4.8.0
+
+# YOLOv8 object detection + ByteTrack (PyTorch pulled in automatically)
+ultralytics>=8.0.0
+
+# Numerical arrays
+numpy>=1.22.0
