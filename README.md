@@ -6,17 +6,6 @@ its own webcam in, its own speakers out. SafeStep moves the camera and
 speakers to the user's browser, while the AI detection and spatial-reasoning
 logic still runs on a server, reused almost unchanged from the original.
 
-## What's the same, what's different
-
-| Module | Status | Notes |
-|---|---|---|
-| `contracts.py` | **Identical** | Copied byte-for-byte. |
-| `spatial/geometry.py` (Lexmi) | **Identical** | Copied byte-for-byte — pure math, no camera/audio dependency. |
-| `models/inference.py` (Jaliba) | **Same logic, new shell** | Identical detection/tracking/smoothing. Restructured so each browser connection gets its own isolated tracker state instead of one shared singleton — required for multiple simultaneous users (see module docstring for why). |
-| `core/camera.py` (Dia) | **Replaced** | A server can't read a browser's camera. Capture now happens in `frontend/static/camera.js` via `getUserMedia`. |
-| `audio/queue_manager.py` (Lia) | **Replaced** | A server can't speak through a browser's speakers. The exact same priority/cooldown/flush logic now runs in `frontend/static/audio.js` via the Web Speech API. |
-| `main.py` | **Replaced** | `backend/server.py` (FastAPI) plays the same orchestrator role, driven by WebSocket messages instead of a local `while True` loop. |
-
 ## Architecture
 
 ```
@@ -28,10 +17,10 @@ Browser                                    Server (FastAPI)
 │                       │                    │   SpatialAnalyzer        │
 │ app.js                │  {alerts,          │                          │
 │  draws boxes on       │   detections}      │ models/inference.py      │
-│  <canvas> overlay     │ ◀───────────────   │  (Jaliba's logic)        │
+│  <canvas> overlay     │ ◀───────────────   │        │
 │                       │   (JSON)           │                          │
 │ audio.js              │                    │ spatial/geometry.py      │
-│  speaks alerts via     │                    │  (Lexmi's logic)         │
+│  speaks alerts via     │                    │          │
 │  Web Speech API        │                    │                          │
 └─────────────────────┘                    └──────────────────────────┘
 ```
