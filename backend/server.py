@@ -1,4 +1,5 @@
 
+
 import asyncio
 import base64
 import logging
@@ -18,6 +19,7 @@ from ultralytics import YOLO
 from config import settings
 from models.inference import InferenceEngine
 from spatial.geometry import SpatialAnalyzer
+from spatial.obstacle_heuristic import ObstacleHeuristic
 
 # ---------------------------------------------------------------------------
 # Logging — same structured style as the original modules
@@ -47,16 +49,61 @@ logger.info("Shared model loaded.")
 
 
 class SessionState:
-    
+    """
+    Everything one connected browser needs, kept isolated from every other
+    connected browser. Created on WebSocket connect, destroyed on disconnect.
+
+    This is the direct replacement for SafeStep Final's two module-level
+    singletons (_engine_instance in inference.py, _analyzer_instance in
+    geometry.py) - those were correct for a single local process, but would
+    silently mix tracking/approach-velocity state between users if reused
+    across multiple simultaneous browser connections.
+    """
 
     def __init__(self, session_id: str):
         self.session_id = session_id
         self.engine = InferenceEngine(shared_model=_shared_model)
         self.analyzer = SpatialAnalyzer(settings.FRAME_WIDTH, settings.FRAME_HEIGHT)
+        # New: catches large, close, unclassified obstacles (walls, doors,
+        # blank surfaces) that YOLO structurally cannot label. Runs
+        # alongside the analyzer, never instead of it. Isolated per
+        # session for the same reason engine/analyzer are — frame history
+        # from one user's camera must never bleed into another's.
+        self.obstacle_heuristic = ObstacleHeuristic()
         self.last_processed_at: float = 0.0
         self.processing_lock = asyncio.Lock()
         self.last_activity: float = time.monotonic()
+        # Tracks the (width, height) the analyzer was last built for, so we
+        # can detect a mismatch against what the browser actually sends.
+        self._analyzer_dims = (settings.FRAME_WIDTH, settings.FRAME_HEIGHT)
         logger.info("Session %s: InferenceEngine + SpatialAnalyzer created.", session_id)
+
+    def ensure_analyzer_matches(self, frame_width: int, frame_height: int) -> None:
+        """
+        BUGFIX (see chat history / README "Known issues"): server.py used to
+        unconditionally assume every incoming frame was exactly
+        settings.FRAME_WIDTH x settings.FRAME_HEIGHT (640x480), because that
+        is what camera.js was *supposed* to send. In practice, phone camera
+        capture can still hand back a frame whose actual decoded size
+        differs from that assumption (camera.js now center-crops correctly,
+        but this is a deliberate backstop in case a particular phone/browser
+        still behaves unexpectedly).
+
+        If the analyzer's assumed dimensions don't match the frame actually
+        decoded this call, rebuild it for the real dimensions. Without this,
+        SpatialAnalyzer's zone_width/distance-ratio math (geometry.py lines
+        ~182, ~193) silently computes against the wrong canvas size, which
+        is exactly what was causing alerts to report the wrong left/right
+        zone and the wrong distance.
+        """
+        if (frame_width, frame_height) != self._analyzer_dims:
+            logger.warning(
+                "Session %s: frame size %dx%d != expected %dx%d — rebuilding "
+                "SpatialAnalyzer for the real dimensions.",
+                self.session_id, frame_width, frame_height, *self._analyzer_dims,
+            )
+            self.analyzer = SpatialAnalyzer(frame_width, frame_height)
+            self._analyzer_dims = (frame_width, frame_height)
 
 
 # Active sessions, keyed by a server-generated session id (one per WebSocket).
@@ -64,7 +111,13 @@ _sessions: Dict[str, SessionState] = {}
 
 
 def _decode_frame(raw_bytes: bytes) -> Optional[np.ndarray]:
-    
+    """
+    Decodes a JPEG byte string (sent from the browser's <canvas>.toBlob())
+    into a BGR numpy array, matching the format cv2.VideoCapture used to
+    hand to process_frame() in the original. Returns None on bad input
+    instead of raising, mirroring how core/camera.py returned None on a
+    dropped frame rather than crashing the pipeline.
+    """
     try:
         arr = np.frombuffer(raw_bytes, dtype=np.uint8)
         frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -82,7 +135,7 @@ async def health() -> dict:
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
-    
+   
     await websocket.accept()
     session_id = str(uuid.uuid4())[:8]
     session = SessionState(session_id)
@@ -128,11 +181,31 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 if frame is None:
                     continue
 
+                # frame.shape is (height, width, channels) for a decoded
+                # BGR image — confirm the analyzer matches reality before
+                # running spatial math against it. See ensure_analyzer_matches()
+                # docstring for why this exists.
+                actual_height, actual_width = frame.shape[0], frame.shape[1]
+                session.ensure_analyzer_matches(actual_width, actual_height)
+
                 # ── 1. Inference (Jaliba's logic, session-isolated) ───────
                 detections = await asyncio.to_thread(session.engine.run_inference, frame)
 
                 # ── 2. Spatial (Lexmi's logic, byte-for-byte unchanged) ───
                 alerts = session.analyzer.process_detections(detections)
+
+                # ── 2b. Unclassified obstacle fallback (new) ───────────────
+                # Only checks frames where YOLO found nothing covering the
+                # center danger zone — see ObstacleHeuristic's docstring.
+                # Runs in a thread for the same reason inference does: the
+                # cv2 Laplacian call is synchronous CPU work and shouldn't
+                # block the event loop, even though it's cheap relative to
+                # YOLO inference.
+                obstacle_alert = await asyncio.to_thread(
+                    session.obstacle_heuristic.check, frame, detections
+                )
+                if obstacle_alert is not None:
+                    alerts = [obstacle_alert] + alerts
 
                 # ── 3. Send results back to the browser ───────────────────
                 payload = {
@@ -149,6 +222,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         _sessions.pop(session_id, None)
         logger.info("Session %s cleaned up. Active sessions: %d", session_id, len(_sessions))
 
+
+# ---------------------------------------------------------------------------
+# Serve the frontend as static files from the same server.
+# Keeps deployment to one Render service instead of two.
+# ---------------------------------------------------------------------------
 app.mount("/static", StaticFiles(directory="../frontend/static"), name="static")
 
 
