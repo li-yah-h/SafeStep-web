@@ -1,4 +1,4 @@
-```markdown
+
 # SafeStep  
 ### Offline AI Navigation Assistant for the Visually Impaired
 
