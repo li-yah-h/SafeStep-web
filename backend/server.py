@@ -49,16 +49,6 @@ logger.info("Shared model loaded.")
 
 
 class SessionState:
-    """
-    Everything one connected browser needs, kept isolated from every other
-    connected browser. Created on WebSocket connect, destroyed on disconnect.
-
-    This is the direct replacement for SafeStep Final's two module-level
-    singletons (_engine_instance in inference.py, _analyzer_instance in
-    geometry.py) - those were correct for a single local process, but would
-    silently mix tracking/approach-velocity state between users if reused
-    across multiple simultaneous browser connections.
-    """
 
     def __init__(self, session_id: str):
         self.session_id = session_id
@@ -79,23 +69,6 @@ class SessionState:
         logger.info("Session %s: InferenceEngine + SpatialAnalyzer created.", session_id)
 
     def ensure_analyzer_matches(self, frame_width: int, frame_height: int) -> None:
-        """
-        BUGFIX (see chat history / README "Known issues"): server.py used to
-        unconditionally assume every incoming frame was exactly
-        settings.FRAME_WIDTH x settings.FRAME_HEIGHT (640x480), because that
-        is what camera.js was *supposed* to send. In practice, phone camera
-        capture can still hand back a frame whose actual decoded size
-        differs from that assumption (camera.js now center-crops correctly,
-        but this is a deliberate backstop in case a particular phone/browser
-        still behaves unexpectedly).
-
-        If the analyzer's assumed dimensions don't match the frame actually
-        decoded this call, rebuild it for the real dimensions. Without this,
-        SpatialAnalyzer's zone_width/distance-ratio math (geometry.py lines
-        ~182, ~193) silently computes against the wrong canvas size, which
-        is exactly what was causing alerts to report the wrong left/right
-        zone and the wrong distance.
-        """
         if (frame_width, frame_height) != self._analyzer_dims:
             logger.warning(
                 "Session %s: frame size %dx%d != expected %dx%d — rebuilding "
@@ -111,13 +84,6 @@ _sessions: Dict[str, SessionState] = {}
 
 
 def _decode_frame(raw_bytes: bytes) -> Optional[np.ndarray]:
-    """
-    Decodes a JPEG byte string (sent from the browser's <canvas>.toBlob())
-    into a BGR numpy array, matching the format cv2.VideoCapture used to
-    hand to process_frame() in the original. Returns None on bad input
-    instead of raising, mirroring how core/camera.py returned None on a
-    dropped frame rather than crashing the pipeline.
-    """
     try:
         arr = np.frombuffer(raw_bytes, dtype=np.uint8)
         frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -227,9 +193,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 # Serve the frontend as static files from the same server.
 # Keeps deployment to one Render service instead of two.
 # ---------------------------------------------------------------------------
-app.mount("/static", StaticFiles(directory="../frontend/static"), name="static")
-
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse("../frontend/static/index.html")
+    return FileResponse("frontend/static/index.html")
