@@ -1,5 +1,12 @@
 {
+  "buildCommand": "",
+  "outputDirectory": "frontend/static",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+    { "source": "/(.*)", "destination": "/" }
+  ],
+  "functions": {
+    "api/*.py": {
+      "excludeFiles": "**/*"
+    }
+  }
 }
