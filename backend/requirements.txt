@@ -1,5 +1,3 @@
-# SafeStep Web — Backend dependencies
-# Install with: pip install -r requirements.txt
 
 # Web server + WebSockets
 fastapi>=0.110.0
