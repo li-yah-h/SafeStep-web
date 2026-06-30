@@ -4,25 +4,39 @@ FRAME_HEIGHT  = 480
 TARGET_FPS    = 30
 CAMERA_ROTATION = 0
 
+# ------------------------------------------------------------------
 # Inference Settings
+# ------------------------------------------------------------------
 MODEL_NAME           = "yolov8n.pt"
 CONFIDENCE_THRESHOLD = 0.45
 
 PREFERRED_VOICE_INDEX = 0  # no longer used server-side; browser picks its own voice
 
+# ------------------------------------------------------------------
 # Spatial / Distance Settings
+# ------------------------------------------------------------------
 CLOSE_DISTANCE_RATIO = 0.85
 MID_DISTANCE_RATIO   = 0.60
 
+# ------------------------------------------------------------------
 # Audio Cooldown Settings (seconds)
+# Used twice now: once as the source of truth, and mirrored in
 # frontend/static/audio.js so client-side cooldown logic matches exactly.
-GLOBAL_AUDIO_COOLDOWN = 5.0
+# ------------------------------------------------------------------
+CRITICAL_COOLDOWN = 2.0
+NAV_COOLDOWN      = 5.0
+ENV_COOLDOWN      = 10.0
 
+# ------------------------------------------------------------------
 # UI / Debug
+# ------------------------------------------------------------------
 SHOW_DEBUG_WINDOW = True   # web equivalent: draw bounding boxes on the <canvas>
 DEBUG_BOX_COLOR = (0, 255, 0)
 
+
+# ==============================================================================
 # WEB-SPECIFIC SETTINGS (new — required because of the browser/server split)
+# ==============================================================================
 
 # Max frames per second the server will actually run inference on, regardless
 # of how fast the browser sends them. On a free-tier CPU box, YOLOv8n inference

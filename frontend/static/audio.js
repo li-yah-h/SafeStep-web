@@ -1,5 +1,9 @@
 
-const GLOBAL_COOLDOWN_SECONDS = 5.0;
+const COOLDOWNS = {
+  1: 2.0,  // CRITICAL_COOLDOWN
+  2: 5.0,  // NAV_COOLDOWN
+  3: 10.0, // ENV_COOLDOWN
+};
 
 class SafeStepAudioEngine {
   constructor() {
@@ -16,7 +20,8 @@ class SafeStepAudioEngine {
     this._queue = [];
     this._sequence = 0;
 
-   this._lastAlertTime = 0;
+    // Per-object_id cooldown tracker: { object_id: lastSpokenTimestampMs }
+    this._cooldownTracker = new Map();
 
     this._speaking = false;
     this._shuttingDown = false;
@@ -32,40 +37,43 @@ class SafeStepAudioEngine {
    * @param {{priority: number, message: string, object_id: string}} alert
    */
   enqueueAlert(alert) {
-  if (this._shuttingDown) return;
+    if (this._shuttingDown) return;
 
-  const now = performance.now();
-  const requiredCooldownMs = GLOBAL_COOLDOWN_SECONDS * 1000;
-  const elapsed = now - this._lastAlertTime;
+    const now = performance.now();
+    const requiredCooldownMs = (COOLDOWNS[alert.priority] ?? COOLDOWNS[3]) * 1000;
+    const lastSpoken = this._cooldownTracker.get(alert.object_id) ?? -Infinity;
+    const elapsed = now - lastSpoken;
 
-  if (elapsed < requiredCooldownMs) {
-    console.debug(
-      `[audio] Suppressed alert: ${alert.message} (${elapsed.toFixed(0)}ms since last alert)`
-    );
-    return;
-  }
-
-  this._lastAlertTime = now;
-
-  // Priority-1 flush...
-  if (alert.priority === 1) {
-    const before = this._queue.length;
-    this._queue = this._queue.filter((item) => item.priority === 1);
-    const dropped = before - this._queue.length;
-    if (dropped > 0) {
-      console.info(`[audio] P1 alert — flushed ${dropped} lower-priority item(s).`);
+    if (elapsed < requiredCooldownMs) {
+      // Same as queue_manager.py: silently suppressed, logged at debug only.
+      return;
     }
+
+    // Mark as spoken now, pre-emptively — same reasoning as the original:
+    // blocks duplicate alerts arriving in the same detection burst before
+    // speech actually starts.
+    this._cooldownTracker.set(alert.object_id, now);
+
+    // Priority-1 flush: drop all pending P2/P3 items, exactly like
+    // _flush_low_priority() in queue_manager.py.
+    if (alert.priority === 1) {
+      const before = this._queue.length;
+      this._queue = this._queue.filter((item) => item.priority === 1);
+      const dropped = before - this._queue.length;
+      if (dropped > 0) {
+        console.info(`[audio] P1 alert — flushed ${dropped} lower-priority item(s).`);
+      }
+    }
+
+    this._queue.push({
+      priority: alert.priority,
+      seq: this._sequence++,
+      message: alert.message,
+    });
+
+    this._sortQueue();
+    this._maybeSpeakNext();
   }
-
-  this._queue.push({
-    priority: alert.priority,
-    seq: this._sequence++,
-    message: alert.message,
-  });
-
-  this._sortQueue();
-  this._maybeSpeakNext();
-}
 
   /**
    * Graceful shutdown — lets the current utterance finish, then stops.

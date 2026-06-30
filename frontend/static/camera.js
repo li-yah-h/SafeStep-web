@@ -13,8 +13,8 @@ class SafeStepCamera {
 
     // Client-side throttle — same intent as SERVER_MAX_FPS, applied at the
     // source so we're not even encoding/sending frames the server would
-    // just drop. 500ms = 2fps, matching the default server throttle.
-    this.sendIntervalMs = opts.sendIntervalMs || 500; 
+    // just drop. 250ms = 4fps, matching the default server throttle.
+    this.sendIntervalMs = opts.sendIntervalMs || 250;
 
     this.stream = null;
     this._captureTimer = null;
